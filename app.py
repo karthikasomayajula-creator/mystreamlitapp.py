@@ -1,41 +1,47 @@
-from openai import OpenAI
 import streamlit as st
+from openai import OpenAI
+from dotenv import load_dotenv
+import os
 
-client = OpenAI(api_key="your_api_key_here")
+# Load API key from .env file
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
 
-response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-        {"role": "user", "content": "Hello, OpenAI!"}
-    ]
-)
+# Initialize OpenAI client
+client = OpenAI(api_key=api_key)
 
-print(response.choices[0].message.content)
+st.title("🌟 Karthika's AI Chatbot")
 
-
-with st.sidebar:
-    openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
-    "[Get an OpenAI API key](https://platform.openai.com/account/api-keys)"
-    "[View the source code](https://github.com/streamlit/llm-examples/blob/main/Chatbot.py)"
-    "[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
-
-st.title("💬 Chatbot")
-st.caption("🚀 A Streamlit chatbot powered by OpenAI")
+# Chat history
 if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+    st.session_state.messages = []
 
+# User input
+user_input = st.text_input("You:", "")
+
+if st.button("Send") or user_input:
+    if user_input:
+        # Append user message
+        st.session_state.messages.append({"role": "user", "content": user_input})
+
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=st.session_state.messages
+        )
+
+        # Extract assistant message
+        assistant_message = response.choices[0].message.content
+
+        # Append assistant message
+        st.session_state.messages.append({"role": "assistant", "content": assistant_message})
+
+        # Clear input box
+        st.experimental_rerun()
+
+# Display chat
 for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
-
-if prompt := st.chat_input():
-    if not openai_api_key:
-        st.info("Please add your OpenAI API key to continue.")
-        st.stop()
-
-    client = OpenAI(api_key=openai_api_key)
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    response = client.chat.completions.create(model="gpt-3.5-turbo", messages=st.session_state.messages)
-    msg = response.choices[0].message.content
-    st.session_state.messages.append({"role": "assistant", "content": msg})
-    st.chat_message("assistant").write(msg)
+    if msg["role"] == "user":
+        st.markdown(f"**You:** {msg['content']}")
+    else:
+        st.markdown(f"**Bot:** {msg['content']}")
