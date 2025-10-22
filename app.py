@@ -8,9 +8,7 @@ load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 
 # Initialize OpenAI client
-client = OpenAI(api_key=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
-
-)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 st.title("🌟 Karthika's AI Chatbot")
 
@@ -47,6 +45,7 @@ for msg in st.session_state.messages:
         st.markdown(f"**You:** {msg['content']}")
     else:
         st.markdown(f"**Bot:** {msg['content']}")
+
 
 
 
