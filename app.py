@@ -1,68 +1,91 @@
-# Academic-Style Streamlit Chatbot Guide
-# Author: Karthika
-# Purpose: Demonstrate how to create a simple AI chatbot using Streamlit and OpenAI API
 
+# Academic Assistant Chatbot
+# Purpose: Upload academic files and interact with AI to get suggestions or answers
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+from PyPDF2 import PdfReader
+import docx
 
 # ------------------------------
-# Step 1: Load environment variables
+# Step 1: Load OpenAI API Key
 # ------------------------------
-# The API key for OpenAI is stored securely in a .env file
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
-# Check if API key exists
 if not openai_api_key:
-    st.error("OpenAI API key not found. Please add it to your .env file.")
+    st.error("OpenAI API key not found. Add it to your .env file.")
     st.stop()
 
-# ------------------------------
-# Step 2: Initialize OpenAI client
-# ------------------------------
 client = OpenAI(api_key=openai_api_key)
 
 # ------------------------------
-# Step 3: Set up Streamlit page
+# Step 2: Page Setup
 # ------------------------------
-st.set_page_config(page_title="AI Chatbot Guide", page_icon="🤖")
-st.title("🌟 Academic AI Chatbot Example")
+st.set_page_config(page_title="Academic Assistant", page_icon="📚")
+st.title("📚 Academic Assistant Chatbot")
 
 # ------------------------------
-# Step 4: Initialize chat history
+# Step 3: Initialize session state
 # ------------------------------
 if "messages" not in st.session_state:
-    st.session_state.messages = []  # Store conversation history
+    st.session_state.messages = []
+
+if "file_text" not in st.session_state:
+    st.session_state.file_text = ""  # Store text extracted from uploaded files
 
 # ------------------------------
-# Step 5: User input section
+# Step 4: File Upload Section
 # ------------------------------
-user_input = st.text_input("Type your message here:")
+uploaded_file = st.file_uploader(
+    "Upload your academic file (PDF, DOCX, TXT)",
+    type=["pdf", "docx", "txt"]
+)
+
+if uploaded_file:
+    if uploaded_file.type == "application/pdf":
+        pdf = PdfReader(uploaded_file)
+        text = ""
+        for page in pdf.pages:
+            text += page.extract_text() + "\n"
+        st.session_state.file_text = text
+    elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        doc = docx.Document(uploaded_file)
+        text = "\n".join([para.text for para in doc.paragraphs])
+        st.session_state.file_text = text
+    elif uploaded_file.type == "text/plain":
+        st.session_state.file_text = uploaded_file.read().decode("utf-8")
+    st.success("File uploaded and text extracted successfully!")
+
+# ------------------------------
+# Step 5: User Input
+# ------------------------------
+user_input = st.text_input("Ask your question or request suggestions:")
 
 if st.button("Send") and user_input:
-    # Step 5a: Save user message
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    # Include uploaded file text as context if available
+    context = st.session_state.file_text
+    messages = [{"role": "system", "content": f"You are an academic assistant. Use the following content to answer questions:\n{context}"}]
+    # Append previous conversation for context
+    messages.extend(st.session_state.messages)
+    # Append user question
+    messages.append({"role": "user", "content": user_input})
 
-    # Step 5b: Call OpenAI API for assistant response
+    # Call OpenAI API
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Change model if needed
-        messages=st.session_state.messages
+        model="gpt-4o-mini",
+        messages=messages
     )
 
-    # Step 5c: Extract assistant response
     assistant_message = response.choices[0].message.content
-
-    # Step 5d: Save assistant response
+    st.session_state.messages.append({"role": "user", "content": user_input})
     st.session_state.messages.append({"role": "assistant", "content": assistant_message})
 
 # ------------------------------
-# Step 6: Display chat history
+# Step 6: Display Chat History (latest first)
 # ------------------------------
 st.subheader("Conversation (Latest messages at top)")
-
-# Display messages in reverse order: latest first
 for msg in reversed(st.session_state.messages):
     if msg["role"] == "user":
         st.markdown(f"**You:** {msg['content']}")
