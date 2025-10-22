@@ -39,7 +39,7 @@ if st.button("Send") or user_input:
         st.session_state.messages.append({"role": "assistant", "content": assistant_message})
 
         # Clear input box
-        st.experimental_rerun()
+        st.rerun()
 
 # Display chat
 for msg in st.session_state.messages:
@@ -47,6 +47,7 @@ for msg in st.session_state.messages:
         st.markdown(f"**You:** {msg['content']}")
     else:
         st.markdown(f"**Bot:** {msg['content']}")
+
 
 
 
