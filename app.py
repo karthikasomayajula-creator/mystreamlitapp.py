@@ -1,27 +1,21 @@
-# Academic Assistant Chatbot
+# Academic Improvement Assistant
 # Author: Karthika
-# Description: Upload academic files (PDF, DOCX, TXT) and get AI-based suggestions or answers.
+# Description: Upload academic files (PDF, DOCX, TXT, JPG) and get AI suggestions or feedback.
 
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
-# Try importing file reader modules safely
+# Optional imports for text documents
 try:
     from PyPDF2 import PdfReader
-except ImportError:
-    st.error("PyPDF2 not found. Please add 'PyPDF2' to requirements.txt or install it with 'pip install PyPDF2'.")
-    st.stop()
-
-try:
     import docx
 except ImportError:
-    st.error("python-docx not found. Please add 'python-docx' to requirements.txt or install it with 'pip install python-docx'.")
-    st.stop()
+    pass  # We'll handle missing modules gracefully
 
 # ------------------------------
-# Step 1: Load OpenAI API key
+# Step 1: Load OpenAI API Key
 # ------------------------------
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -33,72 +27,115 @@ if not openai_api_key:
 client = OpenAI(api_key=openai_api_key)
 
 # ------------------------------
-# Step 2: Streamlit page setup
+# Step 2: Streamlit Page Setup
 # ------------------------------
-st.set_page_config(page_title="📚 Academic Assistant", page_icon="🎓")
-st.title("🎓 Academic Assistant Chatbot")
+st.set_page_config(page_title="📸 Academic Improvement Assistant", page_icon="🎓")
+st.title("🎓 Academic Improvement Assistant")
+
+st.write("Upload your academic work (PDF, DOCX, TXT, or JPG) and get personalized suggestions for improvement.")
 
 # ------------------------------
-# Step 3: Initialize session states
+# Step 3: Initialize Session
 # ------------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "file_text" not in st.session_state:
-    st.session_state.file_text = ""
 
 # ------------------------------
-# Step 4: File upload and text extraction
+# Step 4: File Upload
 # ------------------------------
-uploaded_file = st.file_uploader("📁 Upload your academic file (PDF, DOCX, TXT):", type=["pdf", "docx", "txt"])
+uploaded_file = st.file_uploader(
+    "📁 Upload your academic file or image:",
+    type=["pdf", "docx", "txt", "jpg", "jpeg", "png"]
+)
+
+extracted_text = ""
+image_uploaded = False
+image_path = None
 
 if uploaded_file:
-    extracted_text = ""
+    file_type = uploaded_file.type
 
-    if uploaded_file.type == "application/pdf":
+    # PDF
+    if file_type == "application/pdf":
+        from PyPDF2 import PdfReader
         pdf = PdfReader(uploaded_file)
         for page in pdf.pages:
             extracted_text += page.extract_text() or ""
-    elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+
+    # DOCX
+    elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        import docx
         doc = docx.Document(uploaded_file)
         extracted_text = "\n".join([para.text for para in doc.paragraphs])
-    elif uploaded_file.type == "text/plain":
+
+    # TXT
+    elif file_type == "text/plain":
         extracted_text = uploaded_file.read().decode("utf-8")
 
-    st.session_state.file_text = extracted_text
-    st.success("✅ File uploaded and content extracted successfully!")
+    # Image (JPG/PNG)
+    elif "image" in file_type:
+        image_uploaded = True
+        image_path = f"temp_{uploaded_file.name}"
+        with open(image_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        st.image(image_path, caption="Uploaded Image", use_container_width=True)
+
+    if extracted_text:
+        st.success("✅ File text extracted successfully!")
+    elif image_uploaded:
+        st.success("✅ Image uploaded successfully!")
 
 # ------------------------------
-# Step 5: User input
+# Step 5: User Prompt
 # ------------------------------
-user_input = st.text_input("💬 Ask a question or request academic suggestions:")
+user_input = st.text_input("💬 Describe what you want feedback on (e.g., handwriting, content, clarity):")
 
-if st.button("Send") and user_input:
-    # Create conversation context
-    context = st.session_state.file_text
-    messages = [{"role": "system", "content": f"You are an academic assistant. Use this document for context:\n{context}"}]
-    messages.extend(st.session_state.messages)
-    messages.append({"role": "user", "content": user_input})
+if st.button("Get Suggestions") and uploaded_file:
+    with st.spinner("Analyzing your work..."):
 
-    # Call OpenAI API
-    with st.spinner("Thinking..."):
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages
-        )
+        # For text-based files
+        if not image_uploaded:
+            content = extracted_text if extracted_text else "No readable text found."
+            messages = [
+                {"role": "system", "content": "You are an academic advisor. Analyze the content and suggest areas of improvement."},
+                {"role": "user", "content": f"Here is my work:\n{content}\nPlease give me detailed suggestions for improvement related to {user_input}."}
+            ]
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages
+            )
+            feedback = response.choices[0].message.content
 
-    assistant_message = response.choices[0].message.content
+        # For image-based files
+        else:
+            # Use GPT-4 with vision
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": f"This is my academic work. Please analyze the image and give suggestions for improvement related to: {user_input}."},
+                            {"type": "image_url", "image_url": f"data:image/jpeg;base64,{uploaded_file.getvalue().hex()}"}
+                        ],
+                    }
+                ],
+            )
+            feedback = response.choices[0].message.content
 
-    # Update chat history
+    # Save and display feedback
     st.session_state.messages.append({"role": "user", "content": user_input})
-    st.session_state.messages.append({"role": "assistant", "content": assistant_message})
+    st.session_state.messages.append({"role": "assistant", "content": feedback})
+    st.success("✅ Feedback generated successfully!")
 
 # ------------------------------
-# Step 6: Display conversation
+# Step 6: Display Chat
 # ------------------------------
-st.subheader("🗨️ Conversation (Newest messages on top)")
-
+st.subheader("🗨️ Conversation (Latest First)")
 for msg in reversed(st.session_state.messages):
     if msg["role"] == "user":
         st.markdown(f"**👩‍🎓 You:** {msg['content']}")
     else:
         st.markdown(f"**🤖 Assistant:** {msg['content']}")
+
+  
