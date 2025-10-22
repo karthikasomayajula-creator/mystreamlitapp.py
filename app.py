@@ -1,44 +1,44 @@
 import streamlit as st
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from dotenv import load_dotenv
 import os
 import base64
+import time
 
-# Optional imports for text documents
+# Optional imports for reading docs
 try:
     from PyPDF2 import PdfReader
     import docx
 except ImportError:
     pass
 
-# ------------------------------
+# ------------------------------------------
 # Load API Key
-# ------------------------------
+# ------------------------------------------
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
 if not openai_api_key:
-    st.error("OpenAI API key not found. Add it to your .env file.")
+    st.error("❌ OpenAI API key not found. Add it to your .env file or Streamlit secrets.")
     st.stop()
 
 client = OpenAI(api_key=openai_api_key)
 
-# ------------------------------
-# Streamlit Page Setup
-# ------------------------------
-st.set_page_config(page_title="📸 Academic Improvement Assistant", page_icon="🎓")
+# ------------------------------------------
+# Streamlit App Setup
+# ------------------------------------------
+st.set_page_config(page_title="🎓 Academic Improvement Assistant", page_icon="📘")
 st.title("🎓 Academic Improvement Assistant")
-
-st.write("Upload your academic work (PDF, DOCX, TXT, or JPG/PNG) and get personalized suggestions for improvement.")
+st.write("Upload your academic work (PDF, DOCX, TXT, or image) and get AI-powered improvement suggestions!")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# ------------------------------
+# ------------------------------------------
 # File Upload
-# ------------------------------
+# ------------------------------------------
 uploaded_file = st.file_uploader(
-    "📁 Upload your academic file or image:",
+    "📁 Upload your file here:",
     type=["pdf", "docx", "txt", "jpg", "jpeg", "png"]
 )
 
@@ -74,54 +74,86 @@ if uploaded_file:
     elif image_uploaded:
         st.success("✅ Image uploaded successfully!")
 
-# ------------------------------
+# ------------------------------------------
 # User Prompt
-# ------------------------------
-user_input = st.text_input("💬 Describe what you want feedback on (e.g., handwriting, content, clarity):")
+# ------------------------------------------
+user_input = st.text_input("💬 What do you want feedback on? (e.g., handwriting, clarity, subject knowledge)")
 
 if st.button("Get Suggestions") and uploaded_file:
-    with st.spinner("Analyzing your work..."):
+    with st.spinner("🤔 Analyzing your work... please wait."):
 
-        if not image_uploaded:
-            content = extracted_text if extracted_text else "No readable text found."
-            messages = [
-                {"role": "system", "content": "You are an academic advisor. Analyze the text and give improvement suggestions."},
-                {"role": "user", "content": f"Here is my work:\n{content}\nPlease provide detailed feedback about {user_input}."}
-            ]
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages
-            )
-            feedback = response.choices[0].message.content
+        try:
+            # If it's a text-based document
+            if not image_uploaded:
+                content = extracted_text if extracted_text else "No readable text found."
+                messages = [
+                    {"role": "system", "content": "You are an academic mentor. Give constructive, subject-specific improvement suggestions."},
+                    {"role": "user", "content": f"Here is my academic work:\n{content}\nProvide detailed feedback about {user_input}."}
+                ]
 
-        else:
-            # Use GPT-4 with Vision — correctly encoded image
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": f"Please analyze this image of my academic work and suggest improvements about: {user_input}."},
-                            {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"}
-                        ]
-                    }
-                ],
-            )
-            feedback = response.choices[0].message.content
+                response = None
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages
+                    )
+                except RateLimitError:
+                    st.warning("⚠️ Too many requests. Retrying in 10 seconds...")
+                    time.sleep(10)
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages
+                    )
 
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    st.session_state.messages.append({"role": "assistant", "content": feedback})
-    st.success("✅ Feedback generated successfully!")
+                feedback = response.choices[0].message.content
 
-# ------------------------------
-# Display Chat
-# ------------------------------
+            # If it's an image
+            else:
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": f"Please analyze this image of my academic work and suggest improvements related to {user_input}."},
+                                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"}
+                                ]
+                            }
+                        ],
+                    )
+                except RateLimitError:
+                    st.warning("⚠️ Too many requests. Retrying in 10 seconds...")
+                    time.sleep(10)
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": f"Please analyze this image of my academic work and suggest improvements related to {user_input}."},
+                                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"}
+                                ]
+                            }
+                        ],
+                    )
+
+                feedback = response.choices[0].message.content
+
+            st.session_state.messages.append({"role": "user", "content": user_input})
+            st.session_state.messages.append({"role": "assistant", "content": feedback})
+            st.success("✅ Feedback generated successfully!")
+
+        except Exception as e:
+            st.error("⚠️ The AI is busy or your request limit was reached. Please try again later.")
+            st.stop()
+
+# ------------------------------------------
+# Display Feedback (Latest First)
+# ------------------------------------------
 st.subheader("🗨️ Conversation (Latest First)")
 for msg in reversed(st.session_state.messages):
     if msg["role"] == "user":
         st.markdown(f"**👩‍🎓 You:** {msg['content']}")
     else:
         st.markdown(f"**🤖 Assistant:** {msg['content']}")
-
-   
