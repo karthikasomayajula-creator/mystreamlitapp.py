@@ -16,9 +16,10 @@ st.title("🌟 Karthika's AI Chatbot")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# User input
+# Input box at the top
 user_input = st.text_input("You:")
 
+# Send button
 if st.button("Send") and user_input:
     # Append user message
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -29,16 +30,16 @@ if st.button("Send") and user_input:
         messages=st.session_state.messages
     )
 
-    # Extract assistant message
-    assistant_message = response.choices[0].message.content
-
     # Append assistant message
+    assistant_message = response.choices[0].message.content
     st.session_state.messages.append({"role": "assistant", "content": assistant_message})
 
-# Display chat
-for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        st.markdown(f"**You:** {msg['content']}")
-    else:
-        st.markdown(f"**Bot:** {msg['content']}")
+# Chat container
+with st.container():
+    # Display messages in reverse (latest first)
+    for msg in reversed(st.session_state.messages):
+        if msg["role"] == "user":
+            st.markdown(f"**You:** {msg['content']}")
+        else:
+            st.markdown(f"**Bot:** {msg['content']}")
 
