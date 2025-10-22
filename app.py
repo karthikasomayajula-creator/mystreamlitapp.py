@@ -138,4 +138,3 @@ for msg in reversed(st.session_state.messages):
     else:
         st.markdown(f"**🤖 Assistant:** {msg['content']}")
 
-  
