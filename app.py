@@ -4,11 +4,13 @@ from dotenv import load_dotenv
 import os
 
 # Load API key from .env file
+# Load API key from .env file
 load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 
 # Initialize OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(api_key=api_key)
+
 
 st.title("🌟 Karthika's AI Chatbot")
 
@@ -45,6 +47,7 @@ for msg in st.session_state.messages:
         st.markdown(f"**You:** {msg['content']}")
     else:
         st.markdown(f"**Bot:** {msg['content']}")
+
 
 
 
