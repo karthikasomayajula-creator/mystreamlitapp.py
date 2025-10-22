@@ -42,9 +42,3 @@ for msg in st.session_state.messages:
     else:
         st.markdown(f"**Bot:** {msg['content']}")
 
-
-        
-
-
-
-
