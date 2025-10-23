@@ -77,7 +77,7 @@ if uploaded_file:
 # ------------------------------------------
 # User Prompt
 # ------------------------------------------
-user_input = st.text_input("💬 What do you want feedback on? (e.g., handwriting, clarity, subject knowledge)")
+user_input = st.text_input("💬 What do you want feedback on? (e.g.,technical clarity,completeness,project explanation,implementation detail,report ,structure and innovation subject knowledge)")
 
 if st.button("Get Suggestions") and uploaded_file:
     with st.spinner("🤔 Analyzing your work... please wait."):
@@ -157,3 +157,4 @@ for msg in reversed(st.session_state.messages):
         st.markdown(f"**👩‍🎓 You:** {msg['content']}")
     else:
         st.markdown(f"**🤖 Assistant:** {msg['content']}")
+
